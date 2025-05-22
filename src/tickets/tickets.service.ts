@@ -79,18 +79,14 @@ export class TicketsService {
     });
 
     if (existingTicket) {
-      throw new ConflictException(
-        `Ticket Creation Error - Company already has a ${type} ticket`,
-      );
+      throw new ConflictException(`Company already has a ${type} ticket`);
     }
   }
 
   private getTicketConfig(type: TicketType): TicketConfig {
     const config = this.ticketConfigs[type];
     if (!config) {
-      throw new Error(
-        `Ticket Creation Error - Unsupported ticket type: ${type}`,
-      );
+      throw new Error(`Unsupported ticket type: ${type}`);
     }
     return config;
   }
@@ -104,32 +100,26 @@ export class TicketsService {
 
     if (type === TicketType.registrationAddressChange) {
       if (assignees.length > 1) {
-        throw new ConflictException(
-          'Ticket Creation Error - Multiple secretaries found.',
-        );
+        throw new ConflictException('Multiple secretaries found.');
       }
 
       if (!assignees.length) {
         assignees = await this.findUsersByRole(companyId, UserRole.director);
         if (assignees.length > 1) {
-          throw new ConflictException(
-            'Ticket Creation Error - Multiple directors found.',
-          );
+          throw new ConflictException('Multiple directors found.');
         }
       }
     }
 
     if (type === TicketType.strikeOff) {
       if (assignees.length > 1) {
-        throw new ConflictException(
-          'Ticket Creation Error - Multiple directors found.',
-        );
+        throw new ConflictException('Multiple directors found.');
       }
     }
 
     if (!assignees.length) {
       throw new ConflictException(
-        'Ticket Creation Error - Cannot find an assignee with the required role.',
+        'Cannot find an assignee with the required role.',
       );
     }
 
