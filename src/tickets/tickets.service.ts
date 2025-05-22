@@ -9,6 +9,7 @@ import {
 import { User, UserRole } from '../../db/models/User';
 import { TicketConfig } from './tickets.type';
 import { CreateTicketDto } from './tickets.dto';
+import { Op } from 'sequelize';
 
 @Injectable()
 export class TicketsService {
@@ -20,6 +21,10 @@ export class TicketsService {
     [TicketType.registrationAddressChange]: {
       category: TicketCategory.corporate,
       role: UserRole.corporateSecretary,
+    },
+    [TicketType.strikeOff]: {
+      category: TicketCategory.management,
+      role: UserRole.director,
     },
   };
 
@@ -37,13 +42,35 @@ export class TicketsService {
     const config = this.getTicketConfig(type);
     const assignee = await this.findAssignee(type, companyId, config.role);
 
-    return await Ticket.create({
+    const ticket = await Ticket.create({
       companyId,
       assigneeId: assignee.id,
       category: config.category,
       type,
       status: TicketStatus.open,
     });
+
+    if (type === TicketType.strikeOff) {
+      await this.resolveAllCompanyTickets(companyId, ticket.id);
+    }
+
+    return ticket;
+  }
+
+  private async resolveAllCompanyTickets(
+    companyId: number,
+    excludeTicketId: number,
+  ) {
+    await Ticket.update(
+      { status: TicketStatus.resolved },
+      {
+        where: {
+          companyId,
+          id: { [Op.ne]: excludeTicketId },
+          status: TicketStatus.open,
+        },
+      },
+    );
   }
 
   private async checkForDuplicateTicket(type: TicketType, companyId: number) {
@@ -52,14 +79,18 @@ export class TicketsService {
     });
 
     if (existingTicket) {
-      throw new ConflictException(`Company already has a ${type} ticket`);
+      throw new ConflictException(
+        `Ticket Creation Error - Company already has a ${type} ticket`,
+      );
     }
   }
 
   private getTicketConfig(type: TicketType): TicketConfig {
     const config = this.ticketConfigs[type];
     if (!config) {
-      throw new Error(`Unsupported ticket type: ${type}`);
+      throw new Error(
+        `Ticket Creation Error - Unsupported ticket type: ${type}`,
+      );
     }
     return config;
   }
@@ -74,7 +105,7 @@ export class TicketsService {
     if (type === TicketType.registrationAddressChange) {
       if (assignees.length > 1) {
         throw new ConflictException(
-          'Multiple secretaries found. Cannot create a ticket',
+          'Ticket Creation Error - Multiple secretaries found.',
         );
       }
 
@@ -82,15 +113,23 @@ export class TicketsService {
         assignees = await this.findUsersByRole(companyId, UserRole.director);
         if (assignees.length > 1) {
           throw new ConflictException(
-            'Multiple directors found. Cannot create a ticket',
+            'Ticket Creation Error - Multiple directors found.',
           );
         }
       }
     }
 
+    if (type === TicketType.strikeOff) {
+      if (assignees.length > 1) {
+        throw new ConflictException(
+          'Ticket Creation Error - Multiple directors found.',
+        );
+      }
+    }
+
     if (!assignees.length) {
       throw new ConflictException(
-        'Cannot find an assignee with the required role for this ticket',
+        'Ticket Creation Error - Cannot find an assignee with the required role.',
       );
     }
 

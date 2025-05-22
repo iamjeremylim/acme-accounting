@@ -9,6 +9,7 @@ import {
 import { User, UserRole } from '../../db/models/User';
 import { DbModule } from '../db.module';
 import { TicketsController } from './tickets.controller';
+import { Ticket } from '../../db/models/Ticket';
 
 describe('TicketsController', () => {
   let controller: TicketsController;
@@ -209,6 +210,63 @@ describe('TicketsController', () => {
           controller.create({
             companyId: company.id,
             type: TicketType.registrationAddressChange,
+          }),
+        ).rejects.toEqual(
+          new ConflictException(
+            'Multiple directors found. Cannot create a ticket',
+          ),
+        );
+      });
+    });
+
+    describe('strikeOff', () => {
+      it('creates strikeOff ticket and resolves other active tickets', async () => {
+        const company = await Company.create({ name: 'test' });
+        const director = await User.create({
+          name: 'Test Director',
+          role: UserRole.director,
+          companyId: company.id,
+        });
+
+        // Create some active tickets first
+        const ticket1 = await controller.create({
+          companyId: company.id,
+          type: TicketType.managementReport,
+        });
+
+        // Create strikeOff ticket
+        const strikeOffTicket = await controller.create({
+          companyId: company.id,
+          type: TicketType.strikeOff,
+        });
+
+        // Verify strikeOff ticket
+        expect(strikeOffTicket.category).toBe(TicketCategory.management);
+        expect(strikeOffTicket.assigneeId).toBe(director.id);
+        expect(strikeOffTicket.status).toBe(TicketStatus.open);
+
+        // Verify other tickets are resolved
+        const updatedTicket1 = await Ticket.findByPk(ticket1.id);
+        expect(updatedTicket1?.status).toBe(TicketStatus.resolved);
+      });
+
+      it('throws error if multiple directors exist', async () => {
+        const company = await Company.create({ name: 'test' });
+        await User.create({
+          name: 'Director 1',
+          role: UserRole.director,
+          companyId: company.id,
+        });
+        await User.create({
+          name: 'Director 2',
+          role: UserRole.director,
+          companyId: company.id,
+        });
+
+        await expect(
+          controller.create({
+            companyId: company.id,
+            type: TicketType.strikeOff,
           }),
         ).rejects.toEqual(
           new ConflictException(
