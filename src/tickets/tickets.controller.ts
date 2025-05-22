@@ -1,24 +1,6 @@
 import { Body, Controller, Get, Post } from '@nestjs/common';
-import {
-  TicketCategory,
-  TicketStatus,
-  TicketType,
-} from '../../db/models/Ticket';
 import { TicketsService } from './tickets.service';
-
-interface newTicketDto {
-  type: TicketType;
-  companyId: number;
-}
-
-interface TicketDto {
-  id: number;
-  type: TicketType;
-  companyId: number;
-  assigneeId: number;
-  status: TicketStatus;
-  category: TicketCategory;
-}
+import { CreateTicketDto, TicketDto } from './tickets.dto';
 
 @Controller('api/v1/tickets')
 export class TicketsController {
@@ -30,8 +12,8 @@ export class TicketsController {
   }
 
   @Post()
-  async create(@Body() newTicketDto: newTicketDto) {
-    const ticket = await this.ticketsService.create(newTicketDto);
+  async create(@Body() createTicketDto: CreateTicketDto): Promise<TicketDto> {
+    const ticket = await this.ticketsService.create(createTicketDto);
 
     const ticketDto: TicketDto = {
       id: ticket.id,
