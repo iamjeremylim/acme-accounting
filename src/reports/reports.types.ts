@@ -1,8 +1,6 @@
 export interface ProcessState {
   status: 'idle' | 'processing' | 'completed' | 'error';
-  startTime?: number;
-  endTime?: number;
-  duration?: number;
+  duration?: string;
   progress: number;
   error?: string;
   totalFiles?: number;

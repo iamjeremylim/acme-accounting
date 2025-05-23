@@ -82,6 +82,7 @@ export class ReportsService {
   }
 
   private async processAccountsInBackground() {
+    const startTime = performance.now();
     const scope: ProcessScope = 'accounts';
     const tmpDir = 'tmp';
     const outputFile = 'out/accounts.csv';
@@ -90,7 +91,6 @@ export class ReportsService {
     try {
       this.updateState(scope, {
         status: 'processing',
-        startTime: performance.now(),
         progress: 0,
         processedFiles: 0,
       });
@@ -127,13 +127,10 @@ export class ReportsService {
       }
 
       await fs.writeFile(outputFile, output.join('\n'));
-      const endTime = performance.now();
-      const startTime = this.states[scope].startTime || endTime;
 
       this.updateState(scope, {
         status: 'completed',
-        endTime,
-        duration: endTime - startTime,
+        duration: `finished in ${((performance.now() - startTime) / 1000).toFixed(2)}`,
         progress: 100,
       });
     } catch (error: unknown) {
@@ -148,6 +145,7 @@ export class ReportsService {
   }
 
   private async processYearlyInBackground() {
+    const startTime = performance.now();
     const scope: ProcessScope = 'yearly';
     const tmpDir = 'tmp';
     const outputFile = 'out/yearly.csv';
@@ -156,7 +154,6 @@ export class ReportsService {
     try {
       this.updateState(scope, {
         status: 'processing',
-        startTime: performance.now(),
         progress: 0,
         processedFiles: 0,
       });
@@ -198,13 +195,10 @@ export class ReportsService {
         });
 
       await fs.writeFile(outputFile, output.join('\n'));
-      const endTime = performance.now();
-      const startTime = this.states[scope].startTime || endTime;
 
       this.updateState(scope, {
         status: 'completed',
-        endTime,
-        duration: endTime - startTime,
+        duration: `finished in ${((performance.now() - startTime) / 1000).toFixed(2)}`,
         progress: 100,
       });
     } catch (error: unknown) {
@@ -219,6 +213,7 @@ export class ReportsService {
   }
 
   private async processFinancialStatementsInBackground() {
+    const startTime = performance.now();
     const scope: ProcessScope = 'fs';
     const tmpDir = 'tmp';
     const outputFile = 'out/fs.csv';
@@ -257,7 +252,6 @@ export class ReportsService {
     try {
       this.updateState(scope, {
         status: 'processing',
-        startTime: performance.now(),
         progress: 0,
         processedFiles: 0,
       });
@@ -361,13 +355,10 @@ export class ReportsService {
       );
 
       await fs.writeFile(outputFile, output.join('\n'));
-      const endTime = performance.now();
-      const startTime = this.states[scope].startTime || endTime;
 
       this.updateState(scope, {
         status: 'completed',
-        endTime,
-        duration: endTime - startTime,
+        duration: `finished in ${((performance.now() - startTime) / 1000).toFixed(2)}`,
         progress: 100,
       });
     } catch (error: unknown) {
