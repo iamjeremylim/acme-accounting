@@ -1,16 +1,13 @@
 import { ConflictException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { Company } from '../../db/models/Company';
-import {
-  TicketCategory,
-  TicketStatus,
-  TicketType,
-} from '../../db/models/Ticket';
-import { User, UserRole } from '../../db/models/User';
+import { User } from '../../db/models/User';
 import { DbModule } from '../db.module';
 import { TicketsController } from './tickets.controller';
 import { TicketsService } from './tickets.service';
 import { Ticket } from '../../db/models/Ticket';
+import { UserRole } from '../user/user.type';
+import { TicketCategory, TicketStatus, TicketType } from './tickets.type';
 
 describe('TicketsController', () => {
   let controller: TicketsController;
@@ -49,7 +46,7 @@ describe('TicketsController', () => {
         expect(ticket.assigneeId).toBe(user.id);
         expect(ticket.status).toBe(TicketStatus.open);
       });
-      it('if there are multiple accountants, assign the last one', async () => {
+      it('if there are multiple accountants, assign the recent one', async () => {
         const company = await Company.create({ name: 'test' });
         await User.create({
           name: 'Test User',
@@ -69,7 +66,7 @@ describe('TicketsController', () => {
         expect(ticket.assigneeId).toBe(user2.id);
         expect(ticket.status).toBe(TicketStatus.open);
       });
-      it('if there is no accountant, throw', async () => {
+      it('if there is no accountant, throw an error', async () => {
         const company = await Company.create({ name: 'test' });
         await expect(
           controller.create({
@@ -99,7 +96,7 @@ describe('TicketsController', () => {
         expect(ticket.assigneeId).toBe(user.id);
         expect(ticket.status).toBe(TicketStatus.open);
       });
-      it('if there are multiple secretaries, throw', async () => {
+      it('if there are multiple secretaries, throw an error', async () => {
         const company = await Company.create({ name: 'test' });
         await User.create({
           name: 'Test User',
@@ -118,7 +115,7 @@ describe('TicketsController', () => {
           }),
         ).rejects.toEqual(new ConflictException(`Multiple secretaries found.`));
       });
-      it('if there is no secretary, throw', async () => {
+      it('if there is no secretary, throw an error', async () => {
         const company = await Company.create({ name: 'test' });
         await expect(
           controller.create({

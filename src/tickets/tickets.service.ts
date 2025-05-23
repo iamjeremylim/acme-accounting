@@ -1,32 +1,20 @@
 import { ConflictException, Injectable } from '@nestjs/common';
 import { Company } from '../../db/models/Company';
+import { Ticket } from '../../db/models/Ticket';
+import { User } from '../../db/models/User';
+import { UserRole } from '../user/user.type';
 import {
-  Ticket,
-  TicketCategory,
-  TicketStatus,
+  TicketConfig,
   TicketType,
-} from '../../db/models/Ticket';
-import { User, UserRole } from '../../db/models/User';
-import { TicketConfig } from './tickets.type';
+  TicketStatus,
+  TICKET_CONFIGS,
+} from './tickets.type';
 import { CreateTicketDto } from './tickets.dto';
 import { Op } from 'sequelize';
 
 @Injectable()
 export class TicketsService {
-  private readonly ticketConfigs: Record<TicketType, TicketConfig> = {
-    [TicketType.managementReport]: {
-      category: TicketCategory.accounting,
-      role: UserRole.accountant,
-    },
-    [TicketType.registrationAddressChange]: {
-      category: TicketCategory.corporate,
-      role: UserRole.corporateSecretary,
-    },
-    [TicketType.strikeOff]: {
-      category: TicketCategory.management,
-      role: UserRole.director,
-    },
-  };
+  private readonly ticketConfigs = TICKET_CONFIGS;
 
   async findAll() {
     return await Ticket.findAll({ include: [Company, User] });
