@@ -117,10 +117,11 @@ export class TicketsService {
   private async findUsersByRole(
     companyId: number,
     role: UserRole,
+    orderBy: 'DESC' | 'ASC' = 'DESC',
   ): Promise<User[]> {
     return await User.findAll({
       where: { companyId, role },
-      order: [['createdAt', 'DESC']],
+      order: [['createdAt', orderBy]],
     });
   }
 }

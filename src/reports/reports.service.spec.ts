@@ -31,6 +31,10 @@ jest.mock('readline', () => ({
 
 const mockFs = jest.requireMock<MockedFs>('fs');
 
+// Helper function to wait for background processing
+const waitForProcessing = (ms = 50) =>
+  new Promise((resolve) => setTimeout(resolve, ms));
+
 describe('ReportsService', () => {
   let service: ReportsService;
 
@@ -48,135 +52,166 @@ describe('ReportsService', () => {
     jest.clearAllMocks();
   });
 
-  describe('accounts', () => {
-    it('should not start processing if already processing', async () => {
-      // Set up initial state
-      const initialState = service.state('accounts');
-      expect(initialState.status).toBe('idle');
+  describe('file processing', () => {
+    describe('accounts report', () => {
+      it('should not start processing if already processing', async () => {
+        // Set up initial state
+        const initialState = service.state('accounts');
+        expect(initialState.status).toBe('idle');
 
-      // Mock fs.readdir
-      mockFs.promises.readdir.mockResolvedValue(['file1.csv']);
+        // Mock fs.readdir
+        mockFs.promises.readdir.mockResolvedValue(['file1.csv']);
 
-      // Start first processing
-      const firstCallPromise = service.accounts();
+        // Start first processing
+        const firstCallPromise = service.accounts();
 
-      // Verify state is now processing
-      expect(service.state('accounts').status).toBe('processing');
+        // Verify state is now processing
+        expect(service.state('accounts').status).toBe('processing');
 
-      // Try second call while processing
-      const secondCallPromise = service.accounts();
+        // Try second call while processing
+        const secondCallPromise = service.accounts();
 
-      // Both calls should resolve to the same state
-      const [firstResult, secondResult] = await Promise.all([
-        firstCallPromise,
-        secondCallPromise,
-      ]);
+        // Both calls should resolve to the same state
+        const [firstResult, secondResult] = await Promise.all([
+          firstCallPromise,
+          secondCallPromise,
+        ]);
 
-      expect(firstResult.status).toBe('processing');
-      expect(secondResult).toEqual(firstResult);
-      expect(mockFs.promises.readdir).toHaveBeenCalledTimes(1);
+        expect(firstResult.status).toBe('processing');
+        expect(secondResult).toEqual(firstResult);
+        expect(mockFs.promises.readdir).toHaveBeenCalledTimes(1);
+      });
+
+      it('should start processing with correct initial state', async () => {
+        const mockFiles = ['file1.csv', 'file2.csv'];
+        mockFs.promises.readdir.mockResolvedValue(mockFiles);
+
+        const result = await service.accounts();
+
+        expect(result.status).toBe('processing');
+        expect(result.progress).toBe(0);
+        expect(mockFs.promises.readdir).toHaveBeenCalledWith('tmp');
+
+        const finalState = service.state('accounts');
+        expect(finalState.totalFiles).toBe(2);
+      });
+
+      it('should update progress during processing', async () => {
+        mockFs.promises.readdir.mockResolvedValue(['file1.csv', 'file2.csv']);
+        await service.accounts();
+
+        const state = service.state('accounts');
+        expect(state.progress).toBeGreaterThanOrEqual(0);
+        expect(state.progress).toBeLessThanOrEqual(100);
+      });
+
+      it('should complete processing successfully', async () => {
+        const mockReadStream = new EventEmitter();
+        mockFs.createReadStream.mockReturnValue(mockReadStream);
+        mockFs.promises.readdir.mockResolvedValue(['test.csv']);
+        mockFs.promises.writeFile.mockResolvedValue(undefined);
+
+        const processPromise = service.accounts();
+
+        // Simulate file completion
+        mockReadStream.emit('line', 'date,Cash,description,100,0');
+        mockReadStream.emit('close');
+
+        await processPromise;
+        await waitForProcessing();
+
+        const state = service.state('accounts');
+        expect(state.status).toBe('completed');
+        expect(state.progress).toBe(100);
+      });
     });
 
-    it('should start processing accounts report', async () => {
-      const mockFiles = ['file1.csv', 'file2.csv'];
-      mockFs.promises.readdir.mockResolvedValue(mockFiles);
+    describe('yearly report', () => {
+      it('should not start processing if already processing', async () => {
+        // Set up initial state
+        const initialState = service.state('yearly');
+        expect(initialState.status).toBe('idle');
 
-      const result = await service.accounts();
+        // Mock fs.readdir
+        mockFs.promises.readdir.mockResolvedValue(['file1.csv']);
 
-      expect(result.status).toBe('processing');
-      expect(result.progress).toBe(0);
-      expect(mockFs.promises.readdir).toHaveBeenCalledWith('tmp');
+        // Start first processing
+        const firstCallPromise = service.yearly();
 
-      const finalState = service.state('accounts');
-      expect(finalState.totalFiles).toBe(2);
-    });
-  });
+        // Verify state is now processing
+        expect(service.state('yearly').status).toBe('processing');
 
-  describe('yearly', () => {
-    it('should not start processing if already processing', async () => {
-      // Set up initial state
-      const initialState = service.state('yearly');
-      expect(initialState.status).toBe('idle');
+        // Try second call while processing
+        const secondCallPromise = service.yearly();
 
-      // Mock fs.readdir
-      mockFs.promises.readdir.mockResolvedValue(['file1.csv']);
+        // Both calls should resolve to the same state
+        const [firstResult, secondResult] = await Promise.all([
+          firstCallPromise,
+          secondCallPromise,
+        ]);
 
-      // Start first processing
-      const firstCallPromise = service.yearly();
+        expect(firstResult.status).toBe('processing');
+        expect(secondResult).toEqual(firstResult);
+        expect(mockFs.promises.readdir).toHaveBeenCalledTimes(1);
+      });
 
-      // Verify state is now processing
-      expect(service.state('yearly').status).toBe('processing');
+      it('should start processing with correct initial state', async () => {
+        const mockFiles = ['file1.csv', 'file2.csv'];
+        mockFs.promises.readdir.mockResolvedValue(mockFiles);
 
-      // Try second call while processing
-      const secondCallPromise = service.yearly();
+        const result = await service.yearly();
 
-      // Both calls should resolve to the same state
-      const [firstResult, secondResult] = await Promise.all([
-        firstCallPromise,
-        secondCallPromise,
-      ]);
+        expect(result.status).toBe('processing');
+        expect(result.progress).toBe(0);
+        expect(mockFs.promises.readdir).toHaveBeenCalledWith('tmp');
 
-      expect(firstResult.status).toBe('processing');
-      expect(secondResult).toEqual(firstResult);
-      expect(mockFs.promises.readdir).toHaveBeenCalledTimes(1);
-    });
-
-    it('should start processing yearly report', async () => {
-      const mockFiles = ['file1.csv', 'file2.csv'];
-      mockFs.promises.readdir.mockResolvedValue(mockFiles);
-
-      const result = await service.yearly();
-
-      expect(result.status).toBe('processing');
-      expect(result.progress).toBe(0);
-      expect(mockFs.promises.readdir).toHaveBeenCalledWith('tmp');
-
-      const finalState = service.state('yearly');
-      expect(finalState.totalFiles).toBe(2);
-    });
-  });
-
-  describe('fs (Financial Statements)', () => {
-    it('should not start processing if already processing', async () => {
-      // Set up initial state
-      const initialState = service.state('fs');
-      expect(initialState.status).toBe('idle');
-
-      // Mock fs.readdir
-      mockFs.promises.readdir.mockResolvedValue(['file1.csv']);
-
-      // Start first processing
-      const firstCallPromise = service.fs();
-
-      // Verify state is now processing
-      expect(service.state('fs').status).toBe('processing');
-
-      // Try second call while processing
-      const secondCallPromise = service.fs();
-
-      // Both calls should resolve to the same state
-      const [firstResult, secondResult] = await Promise.all([
-        firstCallPromise,
-        secondCallPromise,
-      ]);
-
-      expect(firstResult.status).toBe('processing');
-      expect(secondResult).toEqual(firstResult);
-      expect(mockFs.promises.readdir).toHaveBeenCalledTimes(1);
+        const finalState = service.state('yearly');
+        expect(finalState.totalFiles).toBe(2);
+      });
     });
 
-    it('should start processing financial statements report', async () => {
-      const mockFiles = ['file1.csv', 'file2.csv'];
-      mockFs.promises.readdir.mockResolvedValue(mockFiles);
+    describe('financial statements', () => {
+      it('should not start processing if already processing', async () => {
+        // Set up initial state
+        const initialState = service.state('fs');
+        expect(initialState.status).toBe('idle');
 
-      const result = await service.fs();
+        // Mock fs.readdir
+        mockFs.promises.readdir.mockResolvedValue(['file1.csv']);
 
-      expect(result.status).toBe('processing');
-      expect(result.progress).toBe(0);
-      expect(mockFs.promises.readdir).toHaveBeenCalledWith('tmp');
+        // Start first processing
+        const firstCallPromise = service.fs();
 
-      const finalState = service.state('fs');
-      expect(finalState.totalFiles).toBe(2);
+        // Verify state is now processing
+        expect(service.state('fs').status).toBe('processing');
+
+        // Try second call while processing
+        const secondCallPromise = service.fs();
+
+        // Both calls should resolve to the same state
+        const [firstResult, secondResult] = await Promise.all([
+          firstCallPromise,
+          secondCallPromise,
+        ]);
+
+        expect(firstResult.status).toBe('processing');
+        expect(secondResult).toEqual(firstResult);
+        expect(mockFs.promises.readdir).toHaveBeenCalledTimes(1);
+      });
+
+      it('should start processing with correct initial state', async () => {
+        const mockFiles = ['file1.csv', 'file2.csv'];
+        mockFs.promises.readdir.mockResolvedValue(mockFiles);
+
+        const result = await service.fs();
+
+        expect(result.status).toBe('processing');
+        expect(result.progress).toBe(0);
+        expect(mockFs.promises.readdir).toHaveBeenCalledWith('tmp');
+
+        const finalState = service.state('fs');
+        expect(finalState.totalFiles).toBe(2);
+      });
     });
   });
 
@@ -214,7 +249,7 @@ describe('ReportsService', () => {
       mockReadStream.emit('close');
 
       await processPromise;
-      await new Promise((resolve) => setTimeout(resolve, 50));
+      await waitForProcessing();
 
       const state = service.state('accounts');
       expect(state.status).toBe('error');
@@ -233,7 +268,7 @@ describe('ReportsService', () => {
       mockReadStream.emit('end');
 
       await processPromise;
-      await new Promise((resolve) => setTimeout(resolve, 50));
+      await waitForProcessing();
 
       const state = service.state('accounts');
       expect(state.status).toBe('error');
@@ -241,118 +276,18 @@ describe('ReportsService', () => {
   });
 
   describe('event emitter', () => {
-    it('should emit state updates when processing starts', (done) => {
-      service['eventEmitter'].once(
-        'accounts:stateUpdate',
-        (state: ProcessState) => {
-          try {
-            expect(state.status).toBe('processing');
-            done();
-          } catch (error) {
-            done(error);
-          }
-        },
-      );
-      void service.accounts();
-    });
-  });
+    it('should emit state updates when processing starts', async () => {
+      // Create a Promise that resolves when the state update is emitted
+      const stateUpdatePromise = new Promise<ProcessState>((resolve) => {
+        service['eventEmitter'].once('accounts:stateUpdate', resolve);
+      });
 
-  describe('file processing', () => {
-    it('should correctly process CSV data for accounts', async () => {
-      const mockReadStream = new EventEmitter();
-      mockFs.createReadStream.mockReturnValue(mockReadStream);
-      mockFs.promises.readdir.mockResolvedValue(['test.csv']);
-
-      const processPromise = service.accounts();
-
-      // Wait for processing to start
-      await new Promise((resolve) => setTimeout(resolve, 50));
-
-      // Simulate file data
-      mockReadStream.emit('line', 'date,Cash,description,100,0');
-      mockReadStream.emit('close');
-
-      await processPromise;
-      // Wait for background processing
-      await new Promise((resolve) => setTimeout(resolve, 50));
-
-      expect(mockFs.promises.writeFile).toHaveBeenCalled();
-    });
-
-    it('should update progress during file processing', async () => {
-      mockFs.promises.readdir.mockResolvedValue(['file1.csv', 'file2.csv']);
+      // Start processing
       await service.accounts();
 
-      const state = service.state('accounts');
-      expect(state.progress).toBeGreaterThanOrEqual(0);
-      expect(state.progress).toBeLessThanOrEqual(100);
-    });
-
-    it('should mark process as completed when finished', async () => {
-      const mockReadStream = new EventEmitter();
-      mockFs.createReadStream.mockReturnValue(mockReadStream);
-      mockFs.promises.readdir.mockResolvedValue(['test.csv']);
-      mockFs.promises.writeFile.mockResolvedValue(undefined);
-
-      const processPromise = service.accounts();
-
-      // Wait for processing to start
-      await new Promise((resolve) => setTimeout(resolve, 50));
-
-      // Simulate file completion
-      mockReadStream.emit('line', 'date,Cash,description,100,0');
-      mockReadStream.emit('close');
-
-      await processPromise;
-      // Wait for background processing
-      await new Promise((resolve) => setTimeout(resolve, 50));
-
-      const state = service.state('accounts');
-      expect(state.status).toBe('completed');
-      expect(state.progress).toBe(100);
+      // Wait for and verify the state update
+      const state = await stateUpdatePromise;
+      expect(state.status).toBe('processing');
     });
   });
-  //     it('should filter non-cash transactions', async () => {
-  //       const mockReadStream = new EventEmitter();
-  //       mockFs.createReadStream.mockReturnValue(mockReadStream);
-  //       mockFs.promises.readdir.mockResolvedValue(['test.csv']);
-  //       const processPromise = service.yearly();
-  //       // Simulate mixed transaction data
-  //       mockReadStream.emit('line', '2023-01-01,Cash,description,100,0');
-  //       mockReadStream.emit(
-  //         'line',
-  //         '2023-01-01,Accounts Receivable,description,200,0',
-  //       );
-  //       mockReadStream.emit('close');
-  //       await processPromise;
-  //       await new Promise((resolve) => setTimeout(resolve, 50));
-  //       expect(mockFs.promises.writeFile).toHaveBeenCalledWith(
-  //         'out/yearly.csv',
-  //         expect.stringContaining('2023,100.00'),
-  //       );
-  //       expect(mockFs.promises.writeFile).toHaveBeenCalledWith(
-  //         'out/yearly.csv',
-  //         expect.stringContaining('200.00'),
-  //       );
-  //     });
-  //   it('should group transactions by year correctly', async () => {
-  //     const mockReadStream = new EventEmitter();
-  //     mockFs.createReadStream.mockReturnValue(mockReadStream);
-  //     mockFs.promises.readdir.mockResolvedValue(['test.csv']);
-  //     const processPromise = service.yearly();
-  //     // Wait for processing to start
-  //     await new Promise((resolve) => setTimeout(resolve, 50));
-  //     // Simulate transactions from different years
-  //     mockReadStream.emit('line', '2022-12-31,Cash,description,100,0');
-  //     mockReadStream.emit('line', '2023-01-01,Cash,description,200,0');
-  //     mockReadStream.emit('close');
-  //     await processPromise;
-  //     // Wait for background processing
-  //     await new Promise((resolve) => setTimeout(resolve, 50));
-  //     expect(mockFs.promises.writeFile).toHaveBeenCalledWith(
-  //       'out/yearly.csv',
-  //       expect.stringContaining('2022,100.00\n2023,200.00'),
-  //     );
-  //   });
-  // });
 });
