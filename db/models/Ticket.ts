@@ -9,22 +9,11 @@ import {
 } from 'sequelize-typescript';
 import { Company } from './Company';
 import { User } from './User';
-
-export enum TicketStatus {
-  open = 'open',
-  resolved = 'resolved',
-}
-
-export enum TicketType {
-  managementReport = 'managementReport',
-  registrationAddressChange = 'registrationAddressChange',
-}
-
-export enum TicketCategory {
-  accounting = 'accounting',
-  corporate = 'registrationAddressChange',
-  management = 'management',
-}
+import {
+  TicketStatus,
+  TicketType,
+  TicketCategory,
+} from '../../src/tickets/tickets.type';
 
 @Table({ tableName: 'tickets' })
 export class Ticket extends Model {
@@ -50,7 +39,6 @@ export class Ticket extends Model {
 
   @BelongsTo(() => Company)
   company: Company;
-
   @BelongsTo(() => User)
   assignee: User;
 }

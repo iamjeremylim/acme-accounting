@@ -8,11 +8,7 @@ import {
   AutoIncrement,
 } from 'sequelize-typescript';
 import { Company } from './Company';
-
-export enum UserRole {
-  accountant = 'accountant',
-  corporateSecretary = 'corporateSecretary',
-}
+import { UserRole } from '../../src/user/user.type';
 
 @Table({ tableName: 'users' })
 export class User extends Model {
